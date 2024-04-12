@@ -5,6 +5,8 @@ import (
     "github.com/nsf/termbox-go"
     "os"
     "fmt"
+    "time"
+    "math/rand"
 )
 
 type Elemento struct {
@@ -36,14 +38,14 @@ var vazio = Elemento{
 }
 
 var inimigo = Elemento{
-    simbolo: '#',
+    simbolo: 'Ω',
     cor: termbox.ColorRed,
     corFundo: termbox.ColorDefault,
     tangivel: true,
 }
 
 var estrela = Elemento{
-    simbolo: '☆',
+    simbolo: '★',
     cor: termbox.ColorYellow,
     corFundo: termbox.ColorDefault,
     tangivel: false,
@@ -74,8 +76,8 @@ func main(){
 	carregarMapa("mapa.txt")
 	desenhaTudo()
 
-    // Muda estrela de lugar
-    // Movimenta inimigo
+    go moverInimigo()
+    go moverEstrela()
 
 	for {
         event := termbox.PollEvent();
@@ -176,14 +178,13 @@ func mover(comando rune) {
     novaPosX, novaPosY := posX+dx, posY+dy
 
     // Fora dos limites
-    if novaPosY < 0 || novaPosY > len(mapa) || novaPosX < 0 || novaPosX > len(mapa[novaPosY]) {
+    if dentroDosLimites(novaPosX, novaPosY) == false {
         return
     }
 
     // Conflito
-    if mapa[novaPosY][novaPosX].tangivel == true {
-
-        if mapa[novaPosY][novaPosX].simbolo == '#' {
+    if mapa[novaPosY][novaPosX].tangivel {
+        if mapa[novaPosY][novaPosX].simbolo == inimigo.simbolo {
             // morrer()
         }
         return
@@ -198,33 +199,73 @@ func interagir() {
     statusMsg = fmt.Sprintf("Interagindo em (%d, %d)", posX, posY)
 }
 
-/*
-func moverInimigo(mapa [][]Elemento, inimigo *Elemento, posX, posY int) {
+func moverInimigo() {
     for {
-        // Espera um tempo aleatório antes de mover o inimigo
-        time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
+        time.Sleep(time.Duration(500) * time.Millisecond)
 
-        // Direções possíveis
         direcoes := []int{-1, 0, 1}
 
-        // Escolhe uma direção aleatória
         dirX := direcoes[rand.Intn(len(direcoes))]
         dirY := direcoes[rand.Intn(len(direcoes))]
 
-        // Nova posição do inimigo
-        novaPosX := posX + dirX
-        novaPosY := posY + dirY
+        novaPosX := posXinimigo + dirX
+        novaPosY := posYinimigo + dirY
 
-        // Verifica se a nova posição é válida
-        if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
-            mapa[novaPosY][novaPosX].tangivel == false {
-
-            // Move o inimigo
-            mapa[posY][posX].inimigo = false
-            mapa[novaPosY][novaPosX].inimigo = true
-            posX = novaPosX
-            posY = novaPosY
+        if dentroDosLimites(novaPosX, novaPosY) == false {
+            return
         }
+
+
+        if mapa[novaPosY][novaPosX].tangivel {
+            if mapa[novaPosY][novaPosX].simbolo == inimigo.simbolo {
+                //morrer()
+            }
+        }
+
+        mapa[posYinimigo][posXinimigo] = vazio
+        posXinimigo = novaPosX
+        posYinimigo = novaPosY
+        mapa[posYinimigo][posXinimigo] = inimigo
+
+        desenhaTudo()
     }
 }
-*/
+
+func moverEstrela() {
+
+    for {
+        time.Sleep(time.Duration(10000) * time.Millisecond)
+
+        optionsY := make([]int, l)
+        optionsX := make([]int, len(mapa[0]))
+
+        dirY := rand.Intn(len(mapa))
+        dirX := rand.Intn(len(mapa[0]))
+
+        novaPosX := posXinimigo + dirX
+        novaPosY := posYinimigo + dirY
+
+        if dentroDosLimites(novaPosX, novaPosY) == false {
+            return
+        }
+
+
+        if mapa[novaPosY][novaPosX].tangivel {
+            if mapa[novaPosY][novaPosX].simbolo == inimigo.simbolo {
+                //morrer()
+            }
+        }
+
+        mapa[posYinimigo][posXinimigo] = vazio
+        posXinimigo = novaPosX
+        posYinimigo = novaPosY
+        mapa[posYinimigo][posXinimigo] = inimigo
+
+        desenhaTudo()
+
+    }
+}
+
+func dentroDosLimites(x int, y int) bool {
+    return y >= 0 && y < len(mapa) && x >= 0 && x < len(mapa)
+}
