@@ -1,12 +1,13 @@
 package main
 
 import (
-    "bufio"
-    "github.com/nsf/termbox-go"
-    "os"
-    "fmt"
-    "time"
-    "math/rand"
+	"bufio"
+	"fmt"
+	"math/rand"
+	"os"
+	"time"
+
+	"github.com/nsf/termbox-go"
 )
 
 type Elemento struct {
@@ -236,23 +237,17 @@ func moverEstrela() {
     for {
         time.Sleep(time.Duration(10000) * time.Millisecond)
 
-        optionsY := make([]int, l)
-        optionsX := make([]int, len(mapa[0]))
+        var novaPosX, novaPosY int
 
-        dirY := rand.Intn(len(mapa))
-        dirX := rand.Intn(len(mapa[0]))
-
-        novaPosX := posXinimigo + dirX
-        novaPosY := posYinimigo + dirY
-
-        if dentroDosLimites(novaPosX, novaPosY) == false {
-            return
-        }
-
-
-        if mapa[novaPosY][novaPosX].tangivel {
-            if mapa[novaPosY][novaPosX].simbolo == inimigo.simbolo {
-                //morrer()
+        for {
+            dirY := rand.Intn(len(mapa))
+            dirX := rand.Intn(len(mapa[0]))
+    
+            novaPosX = posXinimigo + dirX
+            novaPosY = posYinimigo + dirY
+    
+            if dentroDosLimites(novaPosX, novaPosY) == true && mapa[novaPosY][novaPosX].tangivel == false {
+                break
             }
         }
 
@@ -262,7 +257,6 @@ func moverEstrela() {
         mapa[posYinimigo][posXinimigo] = inimigo
 
         desenhaTudo()
-
     }
 }
 

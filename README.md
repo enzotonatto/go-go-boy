@@ -5,5 +5,3 @@
 >> make
 
 >> ./game
-
-Make me water
