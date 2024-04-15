@@ -11,50 +11,50 @@ import (
 )
 
 type Elemento struct {
-	simbolo rune
-	cor termbox.Attribute
+	simbolo  rune
+	cor      termbox.Attribute
 	corFundo termbox.Attribute
 	tangivel bool
 }
-	
+
 var personagem = Elemento{
-	simbolo: '☻',
-	cor: termbox.ColorWhite,
+	simbolo:  '☻',
+	cor:      termbox.ColorWhite,
 	corFundo: termbox.ColorDefault,
 	tangivel: true,
 }
 
 var parede = Elemento{
-	simbolo: '█',
-	cor: termbox.ColorBlack | termbox.AttrBold | termbox.AttrDim,
+	simbolo:  '█',
+	cor:      termbox.ColorBlack | termbox.AttrBold | termbox.AttrDim,
 	corFundo: termbox.ColorDarkGray,
 	tangivel: true,
 }
 
 var vazio = Elemento{
-	simbolo: ' ',
-	cor: termbox.ColorDefault,
+	simbolo:  ' ',
+	cor:      termbox.ColorDefault,
 	corFundo: termbox.ColorDefault,
 	tangivel: false,
 }
 
 var inimigo = Elemento{
-	simbolo: 'Ω',
-	cor: termbox.ColorRed,
+	simbolo:  'Ω',
+	cor:      termbox.ColorRed,
 	corFundo: termbox.ColorDefault,
 	tangivel: true,
 }
 
 var estrela = Elemento{
-	simbolo: '•',
-	cor: termbox.ColorYellow,
+	simbolo:  '•',
+	cor:      termbox.ColorYellow,
 	corFundo: termbox.ColorDefault,
 	tangivel: true,
 }
 
 var portal = Elemento{
-	simbolo: '0',
-	cor: termbox.ColorGreen,
+	simbolo:  '0',
+	cor:      termbox.ColorGreen,
 	corFundo: termbox.ColorDefault,
 	tangivel: true,
 }
@@ -67,7 +67,7 @@ var posX, posY int
 var posXinimigo, posYinimigo int
 var posXestrela, posYestrela int
 
-func main(){
+func main() {
 	err := termbox.Init()
 	if err != nil {
 		panic(err)
@@ -75,24 +75,25 @@ func main(){
 	defer termbox.Close()
 
 	carregarMapa("mapa.txt")
+	//buscarPortais()
 	desenhaTudo()
 
 	go moverInimigo()
 	go moverEstrela()
 
 	for {
-		event := termbox.PollEvent();
-		
+		event := termbox.PollEvent()
+
 		if event.Type == termbox.EventKey {
 			if event.Key == termbox.KeyEsc {
 				return
 			}
-			if (event.Ch == 'e') {
+			if event.Ch == 'e' {
 				interagir()
 			} else {
 				mover(event.Ch)
 			}
-			
+
 			desenhaTudo()
 		}
 	}
@@ -186,15 +187,18 @@ func mover(comando rune) {
 	// Conflito
 	if mapa[novaPosY][novaPosX].tangivel {
 		switch mapa[novaPosY][novaPosX].simbolo {
-		case inimigo.simbolo: {
-			encerrar(false)
-		}
-		case estrela.simbolo: {
-			encerrar(true)
-		}
-		case portal.simbolo: {
-			// muda de posicao
-		}
+		case inimigo.simbolo:
+			{
+				encerrar(false)
+			}
+		case estrela.simbolo:
+			{
+				encerrar(true)
+			}
+		case portal.simbolo:
+			{
+				novaPosX, novaPosY = teleport(novaPosX,novaPosY)
+			}
 		}
 		return
 	}
@@ -286,3 +290,42 @@ func encerrar(ganhou bool) {
 func dentroDosLimites(x int, y int) bool {
 	return y >= 0 && y < len(mapa) && x >= 0 && x < len(mapa[y])
 }
+
+// func buscarPortais() [][]int {
+// 	coordenadasPortais := [][]int{} // Armazena as coordenadas dos portais
+
+// 	// Percorre o mapa linha por linha
+// 	for y, linha := range mapa {
+// 		// Percorre cada elemento da linha
+// 		for x, elemento := range linha {
+// 			// Verifica se o elemento é um portal
+// 			if elemento.simbolo == portal.simbolo {
+// 				// Adiciona as coordenadas do portal à lista
+// 				coordenadasPortais = append(coordenadasPortais, []int{x, y})
+// 			}
+// 		}
+// 	}
+
+// 	// Aloca o portal A para o primeiro encontrado e o portal B para o segundo
+// 	portalA := coordenadasPortais[0]
+// 	portalB := coordenadasPortais[1]
+
+// 	return [][]int{portalA, portalB}
+// }
+
+func teleport(x int, y int) (int, int) {
+
+	portalA := [2]int{79, 2}
+	portalB := [2]int{0, 28}
+
+	if portalA[0] == x && portalA[1] == y{
+		return portalB[0], portalB[1]
+	}
+
+	if portalB[0] == x && portalB[1] == y {
+		return portalA[0], portalA[1]
+	}
+
+	return x, y
+}
+
