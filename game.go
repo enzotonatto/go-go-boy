@@ -196,8 +196,12 @@ func mover(comando rune) {
 		}
 		case portal.simbolo: {
 			novaPosX, novaPosY = teleport(novaPosX,novaPosY)
+			mapa[posY][posX] = vazio
+			posX, posY = novaPosX, novaPosY
+			mapa[posY][posX] = personagem
 		}
 		}
+		return
 	}
 
 	mapa[posY][posX] = vazio
@@ -206,20 +210,25 @@ func mover(comando rune) {
 }
 
 func interagir() {
-	statusMsg = "Você congelou todos!"
-	
 	if interacted {
 		return
 	}
+
+	statusMsg = "Você congelou todos!"
+
+	desenhaBarraDeStatus()
 
 	whileInteract = true
 
 	inimigo.cor = termbox.ColorBlue
 	estrela.cor = termbox.ColorBlue
 
-	time.Sleep(2000 * time.Microsecond)
+	time.Sleep(2000 * time.Millisecond)
 
 	statusMsg = ""
+
+	inimigo.cor = termbox.ColorRed
+	estrela.cor = termbox.ColorYellow
 
 	interacted = true
 	whileInteract = false
