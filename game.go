@@ -60,7 +60,7 @@ var portal = Elemento{
 }
 
 var mapa [][]Elemento
-var interacted, whileInteract bool;
+var interacted, whileInteract bool
 var statusMsg string
 
 var posX, posY int
@@ -88,7 +88,7 @@ func main() {
 				return
 			}
 			if event.Ch == 'e' {
-				interagir()
+				go interagir()
 			} else {
 				mover(event.Ch)
 			}
@@ -216,17 +216,11 @@ func interagir() {
 
 	whileInteract = true
 
-	inimigo.cor = termbox.ColorBlue
-	estrela.cor = termbox.ColorBlue
-
 	desenhaTudo()
 
 	time.Sleep(2000 * time.Millisecond)
 
 	statusMsg = ""
-
-	inimigo.cor = termbox.ColorRed
-	estrela.cor = termbox.ColorYellow
 
 	interacted = true
 	whileInteract = false
