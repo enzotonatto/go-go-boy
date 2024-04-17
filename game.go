@@ -188,11 +188,9 @@ func mover(comando rune) {
 		switch mapa[novaPosY][novaPosX].simbolo {
 		case inimigo.simbolo: {
 			encerrar(false)
-			return
 		}
 		case estrela.simbolo: {
 			encerrar(true)
-			return
 		}
 		case portal.simbolo: {
 			novaPosX, novaPosY = teleport(novaPosX,novaPosY)
@@ -216,12 +214,12 @@ func interagir() {
 
 	statusMsg = "Você congelou todos!"
 
-	desenhaBarraDeStatus()
-
 	whileInteract = true
 
 	inimigo.cor = termbox.ColorBlue
 	estrela.cor = termbox.ColorBlue
+
+	desenhaTudo()
 
 	time.Sleep(2000 * time.Millisecond)
 
@@ -232,6 +230,8 @@ func interagir() {
 
 	interacted = true
 	whileInteract = false
+
+	desenhaTudo()
 }
 
 func moverInimigo() {
