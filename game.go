@@ -198,7 +198,9 @@ func mover(comando rune) {
 		case portal.simbolo:
 			{
 				novaPosX, novaPosY = teleport(novaPosX,novaPosY)
+				mapa[posY][posX] = vazio
 				posX, posY = novaPosX, novaPosY
+				
 			}
 		}
 		return
