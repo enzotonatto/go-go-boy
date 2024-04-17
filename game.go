@@ -75,7 +75,7 @@ func main() {
 	defer termbox.Close()
 
 	carregarMapa("mapa.txt")
-	//buscarPortais()
+	buscarPortais()
 	desenhaTudo()
 
 	go moverInimigo()
@@ -198,6 +198,7 @@ func mover(comando rune) {
 		case portal.simbolo:
 			{
 				novaPosX, novaPosY = teleport(novaPosX,novaPosY)
+				posX, posY = novaPosX, novaPosY
 			}
 		}
 		return
@@ -291,41 +292,33 @@ func dentroDosLimites(x int, y int) bool {
 	return y >= 0 && y < len(mapa) && x >= 0 && x < len(mapa[y])
 }
 
-// func buscarPortais() [][]int {
-// 	coordenadasPortais := [][]int{} // Armazena as coordenadas dos portais
-
-// 	// Percorre o mapa linha por linha
-// 	for y, linha := range mapa {
-// 		// Percorre cada elemento da linha
-// 		for x, elemento := range linha {
-// 			// Verifica se o elemento é um portal
-// 			if elemento.simbolo == portal.simbolo {
-// 				// Adiciona as coordenadas do portal à lista
-// 				coordenadasPortais = append(coordenadasPortais, []int{x, y})
-// 			}
-// 		}
-// 	}
-
-// 	// Aloca o portal A para o primeiro encontrado e o portal B para o segundo
-// 	portalA := coordenadasPortais[0]
-// 	portalB := coordenadasPortais[1]
-
-// 	return [][]int{portalA, portalB}
-// }
-
-func teleport(x int, y int) (int, int) {
-
+func teleport(x int, y int) (int, int) {	
 	portalA := [2]int{79, 2}
 	portalB := [2]int{0, 28}
 
-	if portalA[0] == x && portalA[1] == y{
-		return portalB[0], portalB[1]
+	if x == portalA[0] && y == portalA[1] {
+		return portalB[0] +1, portalB[1]
 	}
 
-	if portalB[0] == x && portalB[1] == y {
-		return portalA[0], portalA[1]
+	if x == portalB[0] && y == portalB[1] {
+		return portalA[0] -1, portalA[1]
 	}
 
 	return x, y
 }
+
+func buscarPortais() []struct{ posX, posY int } {
+	var portais []struct{ posX, posY int }
+
+	for y, linha := range mapa {
+		for x, elem := range linha {
+			if elem.simbolo == portal.simbolo {
+				portais = append(portais, struct{ posX, posY int }{x, y})
+			}
+		}
+	}
+
+	return portais
+}
+
 
