@@ -60,7 +60,7 @@ var portal = Elemento{
 }
 
 var mapa [][]Elemento
-
+var interacted, whileInteract bool;
 var statusMsg string
 
 var posX, posY int
@@ -75,7 +75,6 @@ func main() {
 	defer termbox.Close()
 
 	carregarMapa("mapa.txt")
-	buscarPortais()
 	desenhaTudo()
 
 	go moverInimigo()
@@ -187,23 +186,18 @@ func mover(comando rune) {
 	// Conflito
 	if mapa[novaPosY][novaPosX].tangivel {
 		switch mapa[novaPosY][novaPosX].simbolo {
-		case inimigo.simbolo:
-			{
-				encerrar(false)
-			}
-		case estrela.simbolo:
-			{
-				encerrar(true)
-			}
-		case portal.simbolo:
-			{
-				novaPosX, novaPosY = teleport(novaPosX,novaPosY)
-				mapa[posY][posX] = vazio
-				posX, posY = novaPosX, novaPosY
-				
-			}
+		case inimigo.simbolo: {
+			encerrar(false)
+			return
 		}
-		return
+		case estrela.simbolo: {
+			encerrar(true)
+			return
+		}
+		case portal.simbolo: {
+			novaPosX, novaPosY = teleport(novaPosX,novaPosY)
+		}
+		}
 	}
 
 	mapa[posY][posX] = vazio
@@ -212,12 +206,31 @@ func mover(comando rune) {
 }
 
 func interagir() {
-	statusMsg = fmt.Sprintf("Interagindo em (%d, %d)", posX, posY) // Pode remover
-	// Congela por 5 segundos
+	statusMsg = "Você congelou todos!"
+	
+	if interacted {
+		return
+	}
+
+	whileInteract = true
+
+	inimigo.cor = termbox.ColorBlue
+	estrela.cor = termbox.ColorBlue
+
+	time.Sleep(2000 * time.Microsecond)
+
+	statusMsg = ""
+
+	interacted = true
+	whileInteract = false
 }
 
 func moverInimigo() {
 	for {
+		if whileInteract {
+			continue
+		}
+
 		var dirX, dirY, novaPosX, novaPosY int
 
 		if posXinimigo < posX {
@@ -258,6 +271,10 @@ func moverInimigo() {
 
 func moverEstrela() {
 	for {
+		if whileInteract {
+			continue
+		}
+
 		var novaPosX, novaPosY int
 
 		for {
@@ -308,19 +325,3 @@ func teleport(x int, y int) (int, int) {
 
 	return x, y
 }
-
-func buscarPortais() []struct{ posX, posY int } {
-	var portais []struct{ posX, posY int }
-
-	for y, linha := range mapa {
-		for x, elem := range linha {
-			if elem.simbolo == portal.simbolo {
-				portais = append(portais, struct{ posX, posY int }{x, y})
-			}
-		}
-	}
-
-	return portais
-}
-
-
