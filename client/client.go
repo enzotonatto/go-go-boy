@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"math/rand"
+	"net/rpc"
 	"os"
 	"time"
 
@@ -59,29 +61,119 @@ var portal = Elemento{
 	tangivel: true,
 }
 
-var mapa [][]Elemento
-var interacted, whileInteract bool
-var statusMsg string
+type Position struct {
+    X int
+    Y int
+}
 
-var posX, posY int
-var posXinimigo, posYinimigo int
-var posXestrela, posYestrela int
+type GameState struct {
+    Map      [][]Elemento
+    Players  map[string]Position
+}
+
+type RegisterArgs struct {
+    ClientID string
+}
+
+type RegisterReply struct {
+    InitialState GameState
+}
+
+type GameStateArgs struct {
+    ClientID string
+}
+
+type GameStateReply struct {
+    State GameState
+}
+
+type CommandArgs struct {
+    ClientID      string
+    SequenceNumber int
+    Command       string
+}
+
+type GameClient struct {
+    clientID     string
+    rpcClient    *rpc.Client
+    sequenceNumber int
+    gameState   GameState
+}
+
+func NewGameClient(clientID string, serverAddress string) *GameClient {
+    client, err := rpc.Dial("tcp", serverAddress)
+    if err != nil {
+        log.Fatal("Dialing:", err)
+    }
+
+    gameClient := &GameClient{
+        clientID:      clientID,
+        rpcClient:     client,
+        sequenceNumber: 0,
+    }
+
+    // Register the client with the server
+    registerArgs := RegisterArgs{ClientID: clientID}
+    var registerReply RegisterReply
+    err = client.Call("GameServer.RegisterClient", &registerArgs, &registerReply)
+    if err != nil {
+        log.Fatal("Registering client:", err)
+    }
+
+    gameClient.gameState = registerReply.InitialState
+    return gameClient
+}
+
+func (gc *GameClient) SendCommand(command string) {
+    gc.sequenceNumber++
+    commandArgs := CommandArgs{
+        ClientID:      gc.clientID,
+        SequenceNumber: gc.sequenceNumber,
+        Command:       command,
+    }
+    var reply struct{}
+    err := gc.rpcClient.Call("GameServer.SendCommand", &commandArgs, &reply)
+    if err != nil {
+        log.Println("Sending command:", err)
+    }
+}
+
+func (gc *GameClient) UpdateGameState() {
+    gameStateArgs := GameStateArgs{ClientID: gc.clientID}
+    var gameStateReply GameStateReply
+    err := gc.rpcClient.Call("GameServer.GetGameState", &gameStateArgs, &gameStateReply)
+    if err != nil {
+        log.Println("Getting game state:", err)
+        return
+    }
+
+    gc.gameState = gameStateReply.State
+}
+
+var gameClient *GameClient;
+var clientID string;
+var serverAddress string;
 
 func main() {
-	err := termbox.Init()
+    clientID = "client1"
+    serverAddress = "localhost:1234"
+
+    gameClient = NewGameClient(clientID, serverAddress)
+
+    err := termbox.Init()
 	if err != nil {
 		panic(err)
 	}
 	defer termbox.Close()
 
-	carregarMapa("mapa.txt")
+	carregarMapa("../mapa.txt")
 	desenhaTudo()
 
 	go moverInimigo()
 	go moverEstrela()
 
-	for {
-		event := termbox.PollEvent()
+    for {
+        event := termbox.PollEvent()
 
 		if event.Type == termbox.EventKey {
 			if event.Key == termbox.KeyEsc {
@@ -93,9 +185,10 @@ func main() {
 				mover(event.Ch)
 			}
 
+            gameClient.UpdateGameState()
 			desenhaTudo()
 		}
-	}
+    }
 }
 
 func carregarMapa(nomeArquivo string) {
@@ -118,20 +211,23 @@ func carregarMapa(nomeArquivo string) {
 			case parede.simbolo:
 				elementoAtual = parede
 			case personagem.simbolo:
-				posX, posY = x, y
+				gameClient.gameState.Players[clientID].X  = x
+				gameClient.gameState.Players[clientID].Y  = y
 				elementoAtual = vazio
 			case inimigo.simbolo:
-				posXinimigo, posYinimigo = x, y
+                gameClient.gameState.Enemy.X = x
+                gameClient.gameState.Enemy.Y = y
 				elementoAtual = vazio
 			case estrela.simbolo:
-				posXestrela, posYestrela = x, y
+                gameClient.gameState.Star.X = x
+                gameClient.gameState.Star.Y = y
 				elementoAtual = vazio
 			case portal.simbolo:
 				elementoAtual = portal
 			}
 			linhaElementos = append(linhaElementos, elementoAtual)
 		}
-		mapa = append(mapa, linhaElementos)
+        gameClient.gameState.Map = append(gameClient.gameState.Map, linhaElementos)
 		y++
 	}
 
