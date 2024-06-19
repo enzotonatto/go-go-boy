@@ -22,32 +22,31 @@ Nós desenvolvemos um jogo de labirinto 2D executado diretamente no terminal usa
 - Vitória: Colete a estrela para completar o jogo.
 - Derrota: Evite o inimigo, pois o contato resultará no fim do jogo.
 
-## Instructions
+## Instruções
 
-### Building and Running
+### Compilando e Executando
 
-1. **Start the Server**
+1. **Iniciar o Servidor**
 
 ```sh
 cd server
 go run server.go
 ```
 
-The server will start and listen for incoming client connections on port 1234.
+O servidor iniciará e ficará ouvindo por conexões de clientes na porta 1234.
 
-2. **Start the Client**
+2. **Iniciar o Cliente**
 
 ```sh
 cd client
 go run client.go
 ```
 
-The client will connect to the server, register itself, and begin sending commands and receiving game state updates.
+O cliente se conectará ao servidor, se registrará e começará a enviar comandos e receber atualizações do estado do jogo.
 
-### File Descriptions
-
-- `server/server.go`: Contains the implementation of the GameServer.
-- `client/client.go`: Contains the implementation of the GameClient.
-- `mapa.txt`: Contains the map for the game.
-- `Makefile`: Build automation tool.
-- `.gitignore`: Git ignore file.
+### Descrição dos Arquivos
+- `server/server.go`: Contém a implementação do GameServer.
+- `client/client.go`: Contém a implementação do GameClient.
+- `mapa.txt`: Contém o mapa do jogo.
+- `Makefile`: Ferramenta de automação de build.
+- `.gitignore`: Arquivo de ignorância do Git.

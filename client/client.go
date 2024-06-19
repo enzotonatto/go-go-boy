@@ -62,105 +62,109 @@ var portal = Elemento{
 }
 
 type Position struct {
-    X int
-    Y int
+	X int
+	Y int
 }
 
 type GameState struct {
-    Map      [][]Elemento
-    Players  map[string]Position
+	Map                       [][]Elemento
+	Players                   map[string]Position
+	Enemy                     Position
+	Star                      Position
+	statusMsg                 string
+	interacted, whileInteract bool
 }
 
 type RegisterArgs struct {
-    ClientID string
+	ClientID string
 }
 
 type RegisterReply struct {
-    InitialState GameState
+	InitialState GameState
 }
 
 type GameStateArgs struct {
-    ClientID string
+	ClientID string
 }
 
 type GameStateReply struct {
-    State GameState
+	State GameState
 }
 
 type CommandArgs struct {
-    ClientID      string
-    SequenceNumber int
-    Command       string
+	ClientID       string
+	SequenceNumber int
+	Command        string
 }
 
 type GameClient struct {
-    clientID     string
-    rpcClient    *rpc.Client
-    sequenceNumber int
-    gameState   GameState
+	clientID       string
+	rpcClient      *rpc.Client
+	sequenceNumber int
+	gameState      GameState
 }
 
 func NewGameClient(clientID string, serverAddress string) *GameClient {
-    client, err := rpc.Dial("tcp", serverAddress)
-    if err != nil {
-        log.Fatal("Dialing:", err)
-    }
+	client, err := rpc.Dial("tcp", serverAddress)
+	if err != nil {
+		log.Fatal("Dialing:", err)
+	}
 
-    gameClient := &GameClient{
-        clientID:      clientID,
-        rpcClient:     client,
-        sequenceNumber: 0,
-    }
+	gameClient := &GameClient{
+		clientID:       clientID,
+		rpcClient:      client,
+		sequenceNumber: 0,
+	}
 
-    // Register the client with the server
-    registerArgs := RegisterArgs{ClientID: clientID}
-    var registerReply RegisterReply
-    err = client.Call("GameServer.RegisterClient", &registerArgs, &registerReply)
-    if err != nil {
-        log.Fatal("Registering client:", err)
-    }
+	// Register the client with the server
+	registerArgs := RegisterArgs{ClientID: clientID}
+	var registerReply RegisterReply
+	err = client.Call("GameServer.RegisterClient", &registerArgs, &registerReply)
+	if err != nil {
+		log.Fatal("Registering client:", err)
+	}
 
-    gameClient.gameState = registerReply.InitialState
-    return gameClient
+	gameClient.gameState = registerReply.InitialState
+	return gameClient
 }
 
 func (gc *GameClient) SendCommand(command string) {
-    gc.sequenceNumber++
-    commandArgs := CommandArgs{
-        ClientID:      gc.clientID,
-        SequenceNumber: gc.sequenceNumber,
-        Command:       command,
-    }
-    var reply struct{}
-    err := gc.rpcClient.Call("GameServer.SendCommand", &commandArgs, &reply)
-    if err != nil {
-        log.Println("Sending command:", err)
-    }
+	gc.sequenceNumber++
+	commandArgs := CommandArgs{
+		ClientID:       gc.clientID,
+		SequenceNumber: gc.sequenceNumber,
+		Command:        command,
+	}
+	var reply struct{}
+	err := gc.rpcClient.Call("GameServer.SendCommand", &commandArgs, &reply)
+	if err != nil {
+		log.Println("Sending command:", err)
+	}
 }
 
 func (gc *GameClient) UpdateGameState() {
-    gameStateArgs := GameStateArgs{ClientID: gc.clientID}
-    var gameStateReply GameStateReply
-    err := gc.rpcClient.Call("GameServer.GetGameState", &gameStateArgs, &gameStateReply)
-    if err != nil {
-        log.Println("Getting game state:", err)
-        return
-    }
+	gameStateArgs := GameStateArgs{ClientID: gc.clientID}
+	var gameStateReply GameStateReply
+	err := gc.rpcClient.Call("GameServer.GetGameState", &gameStateArgs, &gameStateReply)
+	if err != nil {
+		log.Println("Getting game state:", err)
+		return
+	}
 
-    gc.gameState = gameStateReply.State
+	gc.gameState = gameStateReply.State
 }
 
-var gameClient *GameClient;
-var clientID string;
-var serverAddress string;
+var gameClient *GameClient
+var clientID string
+var serverAddress string
 
 func main() {
-    clientID = "client1"
-    serverAddress = "localhost:1234"
+	clientID = "client1"
+	serverAddress = "localhost:1234"
 
-    gameClient = NewGameClient(clientID, serverAddress)
+	gameClient = NewGameClient(clientID, serverAddress)
 
-    err := termbox.Init()
+	err := termbox.Init()
 	if err != nil {
 		panic(err)
 	}
@@ -172,8 +176,8 @@ func main() {
 	go moverInimigo()
 	go moverEstrela()
 
-    for {
-        event := termbox.PollEvent()
+	for {
+		event := termbox.PollEvent()
 
 		if event.Type == termbox.EventKey {
 			if event.Key == termbox.KeyEsc {
@@ -185,10 +189,10 @@ func main() {
 				mover(event.Ch)
 			}
 
-            gameClient.UpdateGameState()
+			gameClient.UpdateGameState()
 			desenhaTudo()
 		}
-    }
+	}
 }
 
 func carregarMapa(nomeArquivo string) {
@@ -211,23 +215,25 @@ func carregarMapa(nomeArquivo string) {
 			case parede.simbolo:
 				elementoAtual = parede
 			case personagem.simbolo:
-				gameClient.gameState.Players[clientID].X  = x
-				gameClient.gameState.Players[clientID].Y  = y
+				pos := gameClient.gameState.Players[clientID]
+				pos.X = x
+				pos.Y = y
+				gameClient.gameState.Players[clientID] = pos
 				elementoAtual = vazio
 			case inimigo.simbolo:
-                gameClient.gameState.Enemy.X = x
-                gameClient.gameState.Enemy.Y = y
+				gameClient.gameState.Enemy.X = x
+				gameClient.gameState.Enemy.Y = y
 				elementoAtual = vazio
 			case estrela.simbolo:
-                gameClient.gameState.Star.X = x
-                gameClient.gameState.Star.Y = y
+				gameClient.gameState.Star.X = x
+				gameClient.gameState.Star.Y = y
 				elementoAtual = vazio
 			case portal.simbolo:
 				elementoAtual = portal
 			}
 			linhaElementos = append(linhaElementos, elementoAtual)
 		}
-        gameClient.gameState.Map = append(gameClient.gameState.Map, linhaElementos)
+		gameClient.gameState.Map = append(gameClient.gameState.Map, linhaElementos)
 		y++
 	}
 
@@ -239,7 +245,7 @@ func carregarMapa(nomeArquivo string) {
 func desenhaTudo() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	for y, linha := range mapa {
+	for y, linha := range gameClient.gameState.Map {
 		for x, elem := range linha {
 			termbox.SetCell(x, y, elem.simbolo, elem.cor, elem.corFundo)
 		}
@@ -251,12 +257,12 @@ func desenhaTudo() {
 }
 
 func desenhaBarraDeStatus() {
-	for i, c := range statusMsg {
-		termbox.SetCell(i, len(mapa)+1, c, termbox.ColorBlack, termbox.ColorDefault)
+	for i, c := range gameClient.gameState.statusMsg {
+		termbox.SetCell(i, len(gameClient.gameState.Map)+1, c, termbox.ColorBlack, termbox.ColorDefault)
 	}
 	msg := "Use WASD para mover e E para interagir. ESC para sair."
 	for i, c := range msg {
-		termbox.SetCell(i, len(mapa)+3, c, termbox.ColorBlack, termbox.ColorDefault)
+		termbox.SetCell(i, len(gameClient.gameState.Map)+3, c, termbox.ColorBlack, termbox.ColorDefault)
 	}
 }
 
@@ -272,7 +278,7 @@ func mover(comando rune) {
 	case 'd':
 		dx = 1
 	}
-	novaPosX, novaPosY := posX+dx, posY+dy
+	novaPosX, novaPosY := gameClient.gameState.Players[clientID].X+dx, gameClient.gameState.Players[clientID].Y+dy
 
 	// Fora dos limites
 	if !dentroDosLimites(novaPosX, novaPosY) {
@@ -280,88 +286,99 @@ func mover(comando rune) {
 	}
 
 	// Conflito
-	if mapa[novaPosY][novaPosX].tangivel {
-		switch mapa[novaPosY][novaPosX].simbolo {
-		case inimigo.simbolo: {
-			encerrar(false)
-		}
-		case estrela.simbolo: {
-			encerrar(true)
-		}
-		case portal.simbolo: {
-			novaPosX, novaPosY = teleport(novaPosX,novaPosY)
-			mapa[posY][posX] = vazio
-			posX, posY = novaPosX, novaPosY
-			mapa[posY][posX] = personagem
-		}
+	if gameClient.gameState.Map[novaPosY][novaPosX].tangivel {
+		switch gameClient.gameState.Map[novaPosY][novaPosX].simbolo {
+		case inimigo.simbolo:
+			{
+				encerrar(false)
+			}
+		case estrela.simbolo:
+			{
+				encerrar(true)
+			}
+		case portal.simbolo:
+			{
+				novaPosX, novaPosY = teleport(novaPosX, novaPosY)
+				gameClient.gameState.Map[gameClient.gameState.Players[clientID].Y][gameClient.gameState.Players[clientID].X] = vazio
+
+				pos := gameClient.gameState.Players[clientID]
+				pos.X, pos.Y = novaPosX, novaPosY
+				gameClient.gameState.Players[clientID] = pos
+
+				gameClient.gameState.Map[gameClient.gameState.Players[clientID].Y][gameClient.gameState.Players[clientID].X] = personagem
+			}
 		}
 		return
 	}
 
-	mapa[posY][posX] = vazio
-	posX, posY = novaPosX, novaPosY
-	mapa[posY][posX] = personagem
+	gameClient.gameState.Map[gameClient.gameState.Players[clientID].Y][gameClient.gameState.Players[clientID].X] = vazio
+
+	pos := gameClient.gameState.Players[clientID]
+	pos.X, pos.Y = novaPosX, novaPosY
+	gameClient.gameState.Players[clientID] = pos
+
+	gameClient.gameState.Map[gameClient.gameState.Players[clientID].Y][gameClient.gameState.Players[clientID].X] = personagem
 }
 
 func interagir() {
-	if interacted {
+	if gameClient.gameState.interacted {
 		return
 	}
 
-	statusMsg = "Você congelou todos!"
+	gameClient.gameState.statusMsg = "Você congelou todos!"
 
-	whileInteract = true
+	gameClient.gameState.whileInteract = true
 
 	desenhaTudo()
 
 	time.Sleep(2000 * time.Millisecond)
 
-	statusMsg = ""
+	gameClient.gameState.statusMsg = ""
 
-	interacted = true
-	whileInteract = false
+	gameClient.gameState.interacted = true
+	gameClient.gameState.whileInteract = false
 
 	desenhaTudo()
 }
 
 func moverInimigo() {
 	for {
-		if whileInteract {
+		if gameClient.gameState.whileInteract {
 			continue
 		}
 
 		var dirX, dirY, novaPosX, novaPosY int
 
-		if posXinimigo < posX {
+		if gameClient.gameState.Enemy.X < gameClient.gameState.Players[clientID].X {
 			dirX = 1
-		} else if posXinimigo > posX {
+		} else if gameClient.gameState.Enemy.X > gameClient.gameState.Players[clientID].X {
 			dirX = -1
 		}
 
-		if posYinimigo < posY {
+		if gameClient.gameState.Enemy.Y < gameClient.gameState.Players[clientID].Y {
 			dirY = 1
-		} else if posYinimigo > posY {
+		} else if gameClient.gameState.Enemy.Y > gameClient.gameState.Players[clientID].Y {
 			dirY = -1
 		}
 
-		novaPosX = posXinimigo + dirX
-		novaPosY = posYinimigo + dirY
+		novaPosX = gameClient.gameState.Enemy.X + dirX
+		novaPosY = gameClient.gameState.Enemy.Y + dirY
 
-		if mapa[novaPosY][novaPosX].simbolo == personagem.simbolo {
+		if gameClient.gameState.Map[novaPosY][novaPosX].simbolo == personagem.simbolo {
 			encerrar(false)
 		}
 
-		if !dentroDosLimites(novaPosX, posYinimigo) || mapa[posYinimigo][novaPosX].tangivel {
-			novaPosX = posXinimigo
+		if !dentroDosLimites(novaPosX, gameClient.gameState.Enemy.Y) || gameClient.gameState.Map[gameClient.gameState.Enemy.Y][novaPosX].tangivel {
+			novaPosX = gameClient.gameState.Enemy.X
 		}
 
-		if !dentroDosLimites(posXinimigo, novaPosY) || mapa[novaPosY][posXinimigo].tangivel {
-			novaPosY = posYinimigo
+		if !dentroDosLimites(gameClient.gameState.Enemy.X, novaPosY) || gameClient.gameState.Map[novaPosY][gameClient.gameState.Enemy.X].tangivel {
+			novaPosY = gameClient.gameState.Enemy.Y
 		}
 
-		mapa[posYinimigo][posXinimigo] = vazio
-		posXinimigo, posYinimigo = novaPosX, novaPosY
-		mapa[posYinimigo][posXinimigo] = inimigo
+		gameClient.gameState.Map[gameClient.gameState.Enemy.Y][gameClient.gameState.Enemy.X] = vazio
+		gameClient.gameState.Enemy.X, gameClient.gameState.Enemy.Y = novaPosX, novaPosY
+		gameClient.gameState.Map[gameClient.gameState.Enemy.Y][gameClient.gameState.Enemy.X] = inimigo
 
 		desenhaTudo()
 		time.Sleep(800 * time.Millisecond)
@@ -370,24 +387,24 @@ func moverInimigo() {
 
 func moverEstrela() {
 	for {
-		if whileInteract {
+		if gameClient.gameState.whileInteract {
 			continue
 		}
 
 		var novaPosX, novaPosY int
 
 		for {
-			novaPosY = rand.Intn(len(mapa))
-			novaPosX = rand.Intn(len(mapa[0]))
+			novaPosY = rand.Intn(len(gameClient.gameState.Map))
+			novaPosX = rand.Intn(len(gameClient.gameState.Map[0]))
 
-			if !mapa[novaPosY][novaPosX].tangivel {
+			if !gameClient.gameState.Map[novaPosY][novaPosX].tangivel {
 				break
 			}
 		}
 
-		mapa[posYestrela][posXestrela] = vazio
-		posXestrela, posYestrela = novaPosX, novaPosY
-		mapa[posYestrela][posXestrela] = estrela
+		gameClient.gameState.Map[gameClient.gameState.Star.Y][gameClient.gameState.Star.X] = vazio
+		gameClient.gameState.Star.X, gameClient.gameState.Star.Y = novaPosX, novaPosY
+		gameClient.gameState.Map[gameClient.gameState.Star.Y][gameClient.gameState.Star.X] = estrela
 
 		desenhaTudo()
 		time.Sleep(3000 * time.Millisecond)
@@ -407,19 +424,19 @@ func encerrar(ganhou bool) {
 }
 
 func dentroDosLimites(x int, y int) bool {
-	return y >= 0 && y < len(mapa) && x >= 0 && x < len(mapa[y])
+	return y >= 0 && y < len(gameClient.gameState.Map) && x >= 0 && x < len(gameClient.gameState.Map[y])
 }
 
-func teleport(x int, y int) (int, int) {	
+func teleport(x int, y int) (int, int) {
 	portalA := [2]int{79, 2}
 	portalB := [2]int{0, 28}
 
 	if x == portalA[0] && y == portalA[1] {
-		return portalB[0] +1, portalB[1]
+		return portalB[0] + 1, portalB[1]
 	}
 
 	if x == portalB[0] && y == portalB[1] {
-		return portalA[0] -1, portalA[1]
+		return portalA[0] - 1, portalA[1]
 	}
 
 	return x, y

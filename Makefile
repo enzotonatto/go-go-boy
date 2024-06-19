@@ -7,10 +7,11 @@ go.mod:
 	go get github.com/nsf/termbox-go
 
 build: go.mod
-	go build game.go
+	cd server && go build -o ../bin/server server.go
+	cd client && go build -o ../bin/client client.go
 	
 clean:
-	rm -f game
+	rm -rf bin
 
 distclean: clean
 	rm -f go.mod go.sum
