@@ -2,4 +2,4 @@ game.exe
 game
 go.mod
 go.sum
-./bin
+/bin

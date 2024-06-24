@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/rpc"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/nsf/termbox-go"
 )
@@ -27,10 +32,52 @@ type Position struct {
 }
 
 type Elemento struct {
-	simbolo  rune
-	cor      termbox.Attribute
-	corFundo termbox.Attribute
-	tangivel bool
+	Simbolo  rune
+	Cor      termbox.Attribute
+	CorFundo termbox.Attribute
+	Tangivel bool
+}
+
+var personagem = Elemento{
+	Simbolo:  '☻',
+	Cor:      termbox.ColorWhite,
+	CorFundo: termbox.ColorDefault,
+	Tangivel: true,
+}
+
+var vazio = Elemento{
+	Simbolo:  ' ',
+	Cor:      termbox.ColorDefault,
+	CorFundo: termbox.ColorDefault,
+	Tangivel: false,
+}
+
+var parede = Elemento{
+	Simbolo:  '█',
+	Cor:      termbox.ColorBlack | termbox.AttrBold | termbox.AttrDim,
+	CorFundo: termbox.ColorDarkGray,
+	Tangivel: true,
+}
+
+var inimigo = Elemento{
+	Simbolo:  'Ω',
+	Cor:      termbox.ColorRed,
+	CorFundo: termbox.ColorDefault,
+	Tangivel: true,
+}
+
+var estrela = Elemento{
+	Simbolo:  '•',
+	Cor:      termbox.ColorYellow,
+	CorFundo: termbox.ColorDefault,
+	Tangivel: true,
+}
+
+var portal = Elemento{
+	Simbolo:  '0',
+	Cor:      termbox.ColorGreen,
+	CorFundo: termbox.ColorDefault,
+	Tangivel: true,
 }
 
 type GameState struct {
@@ -38,8 +85,8 @@ type GameState struct {
 	Players                   map[string]Position
 	Enemy                     Position
 	Star                      Position
-	statusMsg                 string
-	interacted, whileInteract bool
+	StatusMsg                 string
+	Interacted, WhileInteract bool
 }
 
 type RegisterArgs struct {
@@ -99,17 +146,12 @@ func (gs *GameServer) SendCommand(args *CommandArgs, reply *struct{}) error {
 		return errors.New("client not registered")
 	}
 
-	// Process the command and update the game state accordingly
-	// Example: simple movement command
-	switch args.Command {
-	case "move_up":
-		client.Position.Y -= 1
-	case "move_down":
-		client.Position.Y += 1
-	case "move_left":
-		client.Position.X -= 1
-	case "move_right":
-		client.Position.X += 1
+	command := []rune(args.Command)
+
+	if command[0] == 'e' {
+		go gs.interagir()
+	} else {
+		gs.mover(command[0], args.ClientID)
 	}
 
 	gs.gameState.Players[args.ClientID] = client.Position
@@ -129,6 +171,219 @@ func (gs *GameServer) GetGameState(args *GameStateArgs, reply *GameStateReply) e
 	return nil
 }
 
+func (gs *GameServer) mover(comando rune, clientId string) {
+	dx, dy := 0, 0
+	switch comando {
+	case 'w':
+		dy = -1
+	case 'a':
+		dx = -1
+	case 's':
+		dy = 1
+	case 'd':
+		dx = 1
+	}
+	novaPosX, novaPosY := gs.gameState.Players[clientId].X+dx, gs.gameState.Players[clientId].Y+dy
+
+	// Fora dos limites
+	if !gs.dentroDosLimites(novaPosX, novaPosY) {
+		return
+	}
+
+	// Conflito
+	if gs.gameState.Map[novaPosY][novaPosX].Tangivel {
+		switch gs.gameState.Map[novaPosY][novaPosX].Simbolo {
+		case inimigo.Simbolo:
+			{
+				gs.encerrar(false)
+			}
+		case estrela.Simbolo:
+			{
+				gs.encerrar(true)
+			}
+		case portal.Simbolo:
+			{
+				novaPosX, novaPosY = gs.teleport(novaPosX, novaPosY)
+				gs.gameState.Map[gs.gameState.Players[clientId].Y][gs.gameState.Players[clientId].X] = vazio
+
+				pos := gs.gameState.Players[clientId]
+				pos.X, pos.Y = novaPosX, novaPosY
+				gs.gameState.Players[clientId] = pos
+
+				gs.gameState.Map[gs.gameState.Players[clientId].Y][gs.gameState.Players[clientId].X] = personagem
+			}
+		}
+		return
+	}
+
+	gs.gameState.Map[gs.gameState.Players[clientId].Y][gs.gameState.Players[clientId].X] = vazio
+
+	pos := gs.gameState.Players[clientId]
+	pos.X, pos.Y = novaPosX, novaPosY
+	gs.gameState.Players[clientId] = pos
+
+	gs.gameState.Map[gs.gameState.Players[clientId].Y][gs.gameState.Players[clientId].X] = personagem
+}
+
+func (gs *GameServer) interagir() {
+	if gs.gameState.Interacted {
+		return
+	}
+
+	gs.gameState.StatusMsg = "Você congelou todos!"
+
+	gs.gameState.WhileInteract = true
+
+	time.Sleep(2000 * time.Millisecond)
+
+	gs.gameState.StatusMsg = ""
+
+	gs.gameState.Interacted = true
+	gs.gameState.WhileInteract = false
+}
+
+func (gs *GameServer) encerrar(ganhou bool) {
+	termbox.Close()
+
+	if ganhou {
+		fmt.Println("Parabéns! Você ganhou o jogo :)")
+	} else {
+		fmt.Println("Você perdeu o jogo :(")
+	}
+
+	os.Exit(1)
+}
+
+func (gs *GameServer) dentroDosLimites(x int, y int) bool {
+	return y >= 0 && y < len(gs.gameState.Map) && x >= 0 && x < len(gs.gameState.Map[y])
+}
+
+func (gs *GameServer) teleport(x int, y int) (int, int) {
+	portalA := [2]int{79, 2}
+	portalB := [2]int{0, 28}
+
+	if x == portalA[0] && y == portalA[1] {
+		return portalB[0] + 1, portalB[1]
+	}
+
+	if x == portalB[0] && y == portalB[1] {
+		return portalA[0] - 1, portalA[1]
+	}
+
+	return x, y
+}
+
+func (gs *GameServer) moverInimigo() {
+	for {
+		if gs.gameState.WhileInteract {
+			continue
+		}
+
+		var dirX, dirY, novaPosX, novaPosY int
+
+		for clientID := range gs.gameState.Players {
+			if gs.gameState.Enemy.X < gs.gameState.Players[clientID].X {
+				dirX = 1
+			} else if gs.gameState.Enemy.X > gs.gameState.Players[clientID].X {
+				dirX = -1
+			}
+
+			if gs.gameState.Enemy.Y < gs.gameState.Players[clientID].Y {
+				dirY = 1
+			} else if gs.gameState.Enemy.Y > gs.gameState.Players[clientID].Y {
+				dirY = -1
+			}
+		}
+
+		novaPosX = gs.gameState.Enemy.X + dirX
+		novaPosY = gs.gameState.Enemy.Y + dirY
+
+		if gs.gameState.Map[novaPosY][novaPosX].Simbolo == personagem.Simbolo {
+			gs.encerrar(false)
+		}
+
+		if !gs.dentroDosLimites(novaPosX, gs.gameState.Enemy.Y) || gs.gameState.Map[gs.gameState.Enemy.Y][novaPosX].Tangivel {
+			novaPosX = gs.gameState.Enemy.X
+		}
+
+		if !gs.dentroDosLimites(gs.gameState.Enemy.X, novaPosY) || gs.gameState.Map[novaPosY][gs.gameState.Enemy.X].Tangivel {
+			novaPosY = gs.gameState.Enemy.Y
+		}
+
+		gs.gameState.Map[gs.gameState.Enemy.Y][gs.gameState.Enemy.X] = vazio
+		gs.gameState.Enemy.X, gs.gameState.Enemy.Y = novaPosX, novaPosY
+		gs.gameState.Map[gs.gameState.Enemy.Y][gs.gameState.Enemy.X] = inimigo
+
+		time.Sleep(800 * time.Millisecond)
+	}
+}
+
+func (gs *GameServer) moverEstrela() {
+	for {
+		if gs.gameState.WhileInteract {
+			continue
+		}
+
+		var novaPosX, novaPosY int
+
+		for {
+			novaPosY = rand.Intn(len(gs.gameState.Map))
+			novaPosX = rand.Intn(len(gs.gameState.Map[0]))
+
+			if !gs.gameState.Map[novaPosY][novaPosX].Tangivel {
+				break
+			}
+		}
+
+		gs.gameState.Map[gs.gameState.Star.Y][gs.gameState.Star.X] = vazio
+		gs.gameState.Star.X, gs.gameState.Star.Y = novaPosX, novaPosY
+		gs.gameState.Map[gs.gameState.Star.Y][gs.gameState.Star.X] = estrela
+
+		time.Sleep(3000 * time.Millisecond)
+	}
+}
+
+func (gs *GameServer) carregarMapa(nomeArquivo string) {
+	arquivo, err := os.Open(nomeArquivo)
+
+	if err != nil {
+		panic(err)
+	}
+	defer arquivo.Close()
+
+	scanner := bufio.NewScanner(arquivo)
+	y := 0
+
+	for scanner.Scan() {
+		linhaTexto := scanner.Text()
+		var linhaElementos []Elemento
+		for x, char := range linhaTexto {
+			elementoAtual := vazio
+			switch char {
+			case parede.Simbolo:
+				elementoAtual = parede
+			case inimigo.Simbolo:
+				gs.gameState.Enemy.X = x
+				gs.gameState.Enemy.Y = y
+				elementoAtual = vazio
+			case estrela.Simbolo:
+				gs.gameState.Star.X = x
+				gs.gameState.Star.Y = y
+				elementoAtual = vazio
+			case portal.Simbolo:
+				elementoAtual = portal
+			}
+			linhaElementos = append(linhaElementos, elementoAtual)
+		}
+		gs.gameState.Map = append(gs.gameState.Map, linhaElementos)
+		y++
+	}
+
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	gameServer := NewGameServer()
 	rpc.Register(gameServer)
@@ -139,4 +394,9 @@ func main() {
 	defer listener.Close()
 	log.Println("Serving RPC server on port 1234")
 	rpc.Accept(listener)
+
+	gameServer.carregarMapa("mapa.txt")
+
+	go gameServer.moverInimigo()
+	go gameServer.moverEstrela()
 }
