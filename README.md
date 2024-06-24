@@ -26,20 +26,24 @@ Nós desenvolvemos um jogo de labirinto 2D executado diretamente no terminal usa
 
 ### Compilando e Executando
 
-1. **Iniciar o Servidor**
+1. **Compilando o código-fonte**
 
 ```sh
-cd server
-go run server.go
+make
+```
+
+2. **Iniciar o Servidor**
+
+```sh
+./bin/server
 ```
 
 O servidor iniciará e ficará ouvindo por conexões de clientes na porta 1234.
 
-2. **Iniciar o Cliente**
+3. **Iniciar o Cliente**
 
 ```sh
-cd client
-go run client.go
+./bin/client
 ```
 
 O cliente se conectará ao servidor, se registrará e começará a enviar comandos e receber atualizações do estado do jogo.

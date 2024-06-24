@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -81,12 +80,12 @@ var portal = Elemento{
 }
 
 type GameState struct {
-	Map                       [][]Elemento
-	Players                   map[string]Position
-	Enemy                     Position
-	Star                      Position
-	StatusMsg                 string
-	Interacted, WhileInteract bool
+	Map                       			[][]Elemento
+	Players                   			map[string]Position
+	Enemy                     			Position
+	Star                      			Position
+	StatusMsg                 			string
+	Interacted, WhileInteract, Running	bool
 }
 
 type RegisterArgs struct {
@@ -108,15 +107,16 @@ type GameStateReply struct {
 type CommandArgs struct {
 	ClientID       string
 	SequenceNumber int
-	Command        string
+	Command        rune
 }
 
 func NewGameServer() *GameServer {
 	return &GameServer{
 		clients: make(map[string]*Client),
 		gameState: GameState{
-			Map:     [][]Elemento{}, // Initialize with the map
+			Map:     [][]Elemento{},
 			Players: make(map[string]Position),
+			Running: true,
 		},
 	}
 }
@@ -129,9 +129,11 @@ func (gs *GameServer) RegisterClient(args *RegisterArgs, reply *RegisterReply) e
 		return errors.New("client already registered")
 	}
 
-	gs.clients[args.ClientID] = &Client{ID: args.ClientID, Position: Position{X: 0, Y: 0}} // Default position
+	position := Position{ X: 4, Y: 12 }
+	gs.clients[args.ClientID] = &Client{ID: args.ClientID, Position: position }
 
-	gs.gameState.Players[args.ClientID] = Position{X: 0, Y: 0}
+	gs.gameState.Players[args.ClientID] = position
+	gs.gameState.Map[position.Y][position.X] = personagem
 
 	reply.InitialState = gs.gameState
 	return nil
@@ -141,20 +143,17 @@ func (gs *GameServer) SendCommand(args *CommandArgs, reply *struct{}) error {
 	gs.mu.Lock()
 	defer gs.mu.Unlock()
 
-	client, exists := gs.clients[args.ClientID]
+	_, exists := gs.clients[args.ClientID]
 	if !exists {
 		return errors.New("client not registered")
 	}
 
-	command := []rune(args.Command)
-
-	if command[0] == 'e' {
+	if args.Command == 'e' {
 		go gs.interagir()
 	} else {
-		gs.mover(command[0], args.ClientID)
+		gs.mover(args.Command, args.ClientID)
 	}
 
-	gs.gameState.Players[args.ClientID] = client.Position
 	return nil
 }
 
@@ -243,15 +242,13 @@ func (gs *GameServer) interagir() {
 }
 
 func (gs *GameServer) encerrar(ganhou bool) {
-	termbox.Close()
+	gs.gameState.Running = false
 
 	if ganhou {
-		fmt.Println("Parabéns! Você ganhou o jogo :)")
+		gs.gameState.StatusMsg = "Parabéns! Você ganhou o jogo :)";
 	} else {
-		fmt.Println("Você perdeu o jogo :(")
+		gs.gameState.StatusMsg = "Você perdeu o jogo :(";
 	}
-
-	os.Exit(1)
 }
 
 func (gs *GameServer) dentroDosLimites(x int, y int) bool {
@@ -314,7 +311,7 @@ func (gs *GameServer) moverInimigo() {
 		gs.gameState.Enemy.X, gs.gameState.Enemy.Y = novaPosX, novaPosY
 		gs.gameState.Map[gs.gameState.Enemy.Y][gs.gameState.Enemy.X] = inimigo
 
-		time.Sleep(800 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 }
 
@@ -386,17 +383,28 @@ func (gs *GameServer) carregarMapa(nomeArquivo string) {
 
 func main() {
 	gameServer := NewGameServer()
+
+	gameServer.carregarMapa("mapa.txt")
+
+	go gameServer.moverInimigo()
+	go gameServer.moverEstrela()
+
 	rpc.Register(gameServer)
 	listener, err := net.Listen("tcp", ":1234")
 	if err != nil {
 		log.Fatal("Listener error:", err)
 	}
 	defer listener.Close()
+
 	log.Println("Serving RPC server on port 1234")
-	rpc.Accept(listener)
 
-	gameServer.carregarMapa("mapa.txt")
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Erro ao aceitar conexão: ", err)
+			continue
+		}
 
-	go gameServer.moverInimigo()
-	go gameServer.moverEstrela()
+		go rpc.ServeConn(conn)
+	}
 }

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"net/rpc"
+	"os"
 	"strconv"
 	"time"
 
@@ -22,12 +25,12 @@ type Position struct {
 }
 
 type GameState struct {
-	Map                       [][]Elemento
-	Players                   map[string]Position
-	Enemy                     Position
-	Star                      Position
-	StatusMsg                 string
-	Interacted, WhileInteract bool
+	Map                       			[][]Elemento
+	Players                   			map[string]Position
+	Enemy                     			Position
+	Star                      			Position
+	StatusMsg                 			string
+	Interacted, WhileInteract, Running	bool
 }
 
 type RegisterArgs struct {
@@ -49,7 +52,7 @@ type GameStateReply struct {
 type CommandArgs struct {
 	ClientID       string
 	SequenceNumber int
-	Command        string
+	Command        rune
 }
 
 type GameClient struct {
@@ -83,7 +86,7 @@ func NewGameClient(clientID string, serverAddress string) *GameClient {
 	return gameClient
 }
 
-func (gc *GameClient) SendCommand(command string) {
+func (gc *GameClient) SendCommand(command rune) {
 	gc.sequenceNumber++
 	commandArgs := CommandArgs{
 		ClientID:       gc.clientID,
@@ -105,6 +108,12 @@ func (gc *GameClient) UpdateGameState() {
 		log.Println("Getting game state:", err)
 		return
 	}
+	if !gameStateReply.State.Running {
+		termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+		termbox.Close()
+		fmt.Println(gameStateReply.State.StatusMsg)
+		os.Exit(1)
+	}
 
 	gc.gameState = gameStateReply.State
 }
@@ -114,8 +123,13 @@ var clientID string
 var serverAddress string
 
 func main() {
+	ip := flag.String("ip", "localhost", "ip to connect")
+	port := flag.String("port", "1234", "port to connect")
+
+	flag.Parse()
+
 	clientID = strconv.FormatInt(time.Now().Unix(), 10)
-	serverAddress = "localhost:1234"
+	serverAddress = *ip + ":" + *port
 
 	gameClient = NewGameClient(clientID, serverAddress)
 
@@ -125,21 +139,26 @@ func main() {
 	}
 	defer termbox.Close()
 
-	desenhaTudo()
-
 	go updateScreen()
+
 	for {
 		event := termbox.PollEvent()
 
 		if event.Type == termbox.EventKey {
-			gameClient.SendCommand(strconv.QuoteRune(event.Ch))
+			if event.Key == termbox.KeyEsc {
+				return
+			}
+			gameClient.SendCommand(event.Ch)
 		}
 	}
 }
 
 func updateScreen() {
-	gameClient.UpdateGameState()
-	time.Sleep(1000 * time.Millisecond)
+	for {
+		gameClient.UpdateGameState()
+		desenhaTudo()
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 func desenhaTudo() {
